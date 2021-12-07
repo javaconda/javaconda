@@ -65,6 +65,8 @@
 		<main-class>org.elephant.conda.CondaService</main-class>
 		<license.licenseName>bsd_2</license.licenseName>
 		<license.copyrightOwners>Institut de génomique fonctionnelle de Lyon.</license.copyrightOwners>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
 	</properties>
 
 	<dependencies>
