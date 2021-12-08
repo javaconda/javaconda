@@ -9,7 +9,7 @@
 
 	<name>Java Conda</name>
 	<description>Conda wrapper for Java.</description>
-	<url>https://github.com/elephant-track/javaconda</url>
+	<url>https://github.com/ksugar/javaconda</url>
 	<inceptionYear>2021</inceptionYear>
 	<organization>
 		<name>Institut de génomique fonctionnelle de Lyon</name>
@@ -47,14 +47,14 @@
 	</contributors>
 
 	<scm>
-		<connection>scm:git:git://github.com/elephant-track/javaconda</connection>
-		<developerConnection>scm:git:git@github.com:elephant-track/javaconda</developerConnection>
+		<connection>scm:git:git://github.com/ksugar/javaconda</connection>
+		<developerConnection>scm:git:git@github.com:ksugar/javaconda</developerConnection>
 		<tag>HEAD</tag>
-		<url>https://github.com/elephant-track/scijava-conda</url>
+		<url>https://github.com/ksugar/javaconda</url>
 	</scm>
 	<issueManagement>
 		<system>GitHub Issues</system>
-		<url>https://github.com/elephant-track/scijava-conda/issues</url>
+		<url>https://github.com/ksugar/javaconda/issues</url>
 	</issueManagement>
 	<ciManagement>
 		<system>None</system>
@@ -62,7 +62,7 @@
 
 	<properties>
 		<package-name>org.elephant</package-name>
-		<main-class>org.elephant.conda.CondaService</main-class>
+		<main-class>org.elephant.conda.Conda</main-class>
 		<license.licenseName>bsd_2</license.licenseName>
 		<license.copyrightOwners>Institut de génomique fonctionnelle de Lyon.</license.copyrightOwners>
 		<maven.compiler.source>1.8</maven.compiler.source>
