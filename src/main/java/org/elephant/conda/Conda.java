@@ -36,6 +36,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
@@ -59,11 +60,11 @@ public class Conda
 
 	private final static String DOWNLOAD_URL_WIN = "https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe";
 
-	private final String path;
+	private final String rootdir;
 
-	final String condaCommand = SystemUtils.IS_OS_WINDOWS ? "condabin/conda.exe" : "condabin/conda";
+	final String condaCommand = SystemUtils.IS_OS_WINDOWS ? "condabin\\conda.bat" : "condabin/conda";
 
-	final String pythonCommand = SystemUtils.IS_OS_WINDOWS ? "envs/%s/python.exe" : "envs/%s/bin/python";
+	final String pythonCommand = SystemUtils.IS_OS_WINDOWS ? "envs\\%s\\python.exe" : "envs/%s/bin/python";
 
 	/**
 	 * Returns a {@link ProcessBuilder} with the working directory specified in the
@@ -72,13 +73,32 @@ public class Conda
 	 * @return The {@link ProcessBuilder} with the working directory specified in
 	 *         the constructor.
 	 */
-	private ProcessBuilder getBuilder()
+	private ProcessBuilder getBuilder( final boolean isInheritIO )
 	{
-		return new ProcessBuilder().directory( new File( path ) );
+		final ProcessBuilder builder = new ProcessBuilder().directory( new File( rootdir ) );
+		if ( isInheritIO )
+			builder.inheritIO();
+		return builder;
 	}
 
 	/**
-	 * Create a new Conda object. The root path for Conda installation can be
+	 * Returns {@code \{"cmd.exe", "/c"\}} for Windows and an empty list for
+	 * Mac/Linux.
+	 * 
+	 * @return {@code \{"cmd.exe", "/c"\}} for Windows and an empty list for
+	 *         Mac/Linux.
+	 * @throws IOException
+	 */
+	private List< String > getBaseCommand()
+	{
+		final List< String > cmd = new ArrayList<>();
+		if ( SystemUtils.IS_OS_WINDOWS )
+			cmd.addAll( Arrays.asList( "cmd.exe", "/c" ) );
+		return cmd;
+	}
+
+	/**
+	 * Create a new Conda object. The root dir for Conda installation can be
 	 * specified as {@code String}. If there is no directory found at the specified
 	 * path, Miniconda will be automatically installed in the path. It is expected
 	 * that the Conda installation has executable commands as shown below:
@@ -86,14 +106,15 @@ public class Conda
 	 * <pre>
 	 * CONDA_ROOT
 	 * ├── condabin
-	 * │   ├── conda(.exe)
-	 * │   ... ├── envs
+	 * │   ├── conda(.bat)
+	 * │   ... 
+	 * ├── envs
 	 * │   ├── your_env
 	 * │   │   ├── python(.exe)
 	 * </pre>
 	 * 
-	 * @param path
-	 *            The root path for Conda installation.
+	 * @param rootdir
+	 *            The root dir for Conda installation.
 	 * @throws IOException
 	 *             If an I/O error occurs.
 	 * @throws InterruptedException
@@ -101,9 +122,9 @@ public class Conda
 	 *             is waiting, then the wait is ended and an InterruptedException is
 	 *             thrown.
 	 */
-	public Conda( final String path ) throws IOException, InterruptedException
+	public Conda( final String rootdir ) throws IOException, InterruptedException
 	{
-		if ( Files.notExists( Paths.get( path ) ) )
+		if ( Files.notExists( Paths.get( rootdir ) ) )
 		{
 			String downloadUrl = null;
 			if ( SystemUtils.IS_OS_WINDOWS )
@@ -125,17 +146,19 @@ public class Conda
 					TIMEOUT_MILLIS,
 					TIMEOUT_MILLIS );
 			if ( SystemUtils.IS_OS_WINDOWS )
-				new ProcessBuilder().command( "start", "/wait", "\"\"", tempFile.getAbsolutePath(), "/InstallationType=JustMe", "/RegisterPython=0", "/S", path )
+				new ProcessBuilder().command( "cmd.exe", "/c", "start", "/wait", "\"\"", tempFile.getAbsolutePath(), "/InstallationType=JustMe", "/AddToPath=0", "/RegisterPython=0", "/S", "/D=" + rootdir )
 						.inheritIO().start().waitFor();
 			else
-				new ProcessBuilder().command( "bash", tempFile.getAbsolutePath(), "-b", "-p", path )
+				new ProcessBuilder().command( "bash", tempFile.getAbsolutePath(), "-b", "-p", rootdir )
 						.inheritIO().start().waitFor();
 		}
-		this.path = path;
+		this.rootdir = rootdir;
 
 		// The following command will throw an exception if Conda does not work as
 		// expected.
-		getBuilder().command( condaCommand, "-V" ).start().waitFor();
+		final List< String > cmd = getBaseCommand();
+		cmd.addAll( Arrays.asList( condaCommand, "-V" ) );
+		getBuilder( false ).command( cmd ).start().waitFor();
 	}
 
 	/**
@@ -151,7 +174,9 @@ public class Conda
 	 */
 	public String getVersion() throws IOException, InterruptedException
 	{
-		final Process process = getBuilder().command( condaCommand, "-V" ).start();
+		final List< String > cmd = getBaseCommand();
+		cmd.addAll( Arrays.asList( condaCommand, "-V" ) );
+		final Process process = getBuilder( false ).command( cmd ).start();
 		process.waitFor();
 		return new BufferedReader( new InputStreamReader( process.getInputStream() ) ).readLine();
 	}
@@ -169,10 +194,10 @@ public class Conda
 	 */
 	public void runConda( final String... args ) throws IOException, InterruptedException
 	{
-		final List< String > cmd = new ArrayList<>();
+		final List< String > cmd = getBaseCommand();
 		cmd.add( condaCommand );
 		cmd.addAll( Arrays.asList( args ) );
-		getBuilder().command( cmd ).inheritIO().start().waitFor();
+		getBuilder( true ).command( cmd ).start().waitFor();
 	}
 
 	/**
@@ -189,10 +214,20 @@ public class Conda
 	 */
 	public void runPython( final String envName, final String... args ) throws IOException, InterruptedException
 	{
-		final List< String > cmd = new ArrayList<>();
+		final List< String > cmd = getBaseCommand();
 		cmd.add( String.format( pythonCommand, envName ) );
 		cmd.addAll( Arrays.asList( args ) );
-		getBuilder().command( cmd ).inheritIO().start().waitFor();
+		final ProcessBuilder builder = getBuilder( true );
+		if ( SystemUtils.IS_OS_WINDOWS )
+		{
+			final Map< String, String > envs = builder.environment();
+			final String envDir = Paths.get( rootdir, "envs", envName ).toString();
+			envs.put( "Path", envDir + ";" + envs.get( "Path" ) );
+			envs.put( "Path", Paths.get( envDir, "Scripts" ).toString() + ";" + envs.get( "Path" ) );
+			envs.put( "Path", Paths.get( envDir, "Library" ).toString() + ";" + envs.get( "Path" ) );
+			envs.put( "Path", Paths.get( envDir, "Library", "Bin" ).toString() + ";" + envs.get( "Path" ) );
+		}
+		builder.command( cmd ).start().waitFor();
 	}
 
 	/**
@@ -208,7 +243,7 @@ public class Conda
 	 */
 	public List< String > getEnvs() throws IOException
 	{
-		return Files.list( Paths.get( path, "envs" ) )
+		return Files.list( Paths.get( rootdir, "envs" ) )
 				.map( p -> p.getFileName().toString() )
 				.filter( p -> !p.startsWith( "." ) )
 				.collect( Collectors.toList() );
