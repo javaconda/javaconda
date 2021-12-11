@@ -35,6 +35,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -70,6 +71,9 @@ public class Conda
 	 * Returns a {@link ProcessBuilder} with the working directory specified in the
 	 * constructor.
 	 * 
+	 * @param isInheritIO
+	 *            Sets the source and destination for subprocess standard I/O to be
+	 *            the same as those of the current Java process.
 	 * @return The {@link ProcessBuilder} with the working directory specified in
 	 *         the constructor.
 	 */
@@ -184,7 +188,8 @@ public class Conda
 	/**
 	 * Run a Conda command with one or more arguments.
 	 * 
-	 * @params args One or more arguments for the Conda command.
+	 * @param args
+	 *            One or more arguments for the Conda command.
 	 * @throws IOException
 	 *             If an I/O error occurs.
 	 * @throws InterruptedException
@@ -201,10 +206,15 @@ public class Conda
 	}
 
 	/**
-	 * Run a Python command in the specified environment.
+	 * Run a Python command in the specified environment. This method automatically
+	 * sets environment variables associated with the specified environment. In
+	 * Windows, this method also sets the {@code PATH} environment variable so that
+	 * the specified environment runs as expected.
 	 * 
-	 * @params envName The environment name used to run the Python command.
-	 * @params args One or more arguments for the Python command.
+	 * @param envName
+	 *            The environment name used to run the Python command.
+	 * @param args
+	 *            One or more arguments for the Python command.
 	 * @throws IOException
 	 *             If an I/O error occurs.
 	 * @throws InterruptedException
@@ -227,7 +237,42 @@ public class Conda
 			envs.put( "Path", Paths.get( envDir, "Library" ).toString() + ";" + envs.get( "Path" ) );
 			envs.put( "Path", Paths.get( envDir, "Library", "Bin" ).toString() + ";" + envs.get( "Path" ) );
 		}
+		builder.environment().putAll( getEnvironmentVariables( envName ) );
 		builder.command( cmd ).start().waitFor();
+	}
+
+	/**
+	 * Returns environment variables associated with the specified environment as
+	 * {@code Map< String, String >}.
+	 * 
+	 * @param envName
+	 *            The environment name used to run the Python command.
+	 * @return The environment variables as {@code Map< String, String >}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public Map< String, String > getEnvironmentVariables( final String envName ) throws IOException, InterruptedException
+	{
+		final List< String > cmd = getBaseCommand();
+		cmd.addAll( Arrays.asList( condaCommand, "env", "config", "vars", "list", "-n", envName ) );
+		final Process process = getBuilder( false ).command( cmd ).start();
+		process.waitFor();
+		final Map< String, String > map = new HashMap<>();
+		try (final BufferedReader reader = new BufferedReader( new InputStreamReader( process.getInputStream() ) ))
+		{
+			String line;
+
+			while ( ( line = reader.readLine() ) != null )
+			{
+				final String[] keyVal = line.split( " = " );
+				map.put( keyVal[ 0 ], keyVal[ 1 ] );
+			}
+		}
+		return map;
 	}
 
 	/**

@@ -1,0 +1,7 @@
+channels:
+  - defaults
+dependencies:
+  - python=3.7
+variables:
+  JAVACONDA_TEST_VAR1: valueA
+  JAVACONDA_TEST_VAR2: valueB
