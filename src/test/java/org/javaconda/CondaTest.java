@@ -24,7 +24,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-package org.elephant.conda;
+package org.javaconda;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -41,6 +41,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.javaconda.Conda;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -63,10 +64,10 @@ public class CondaTest
 	 * methods are tested:
 	 * <p>
 	 * <ul>
-	 * <li>{@link Conda#getVersion}
-	 * <li>{@link Conda#runConda}
-	 * <li>{@link Conda#runPython}
-	 * <li>{@link Conda#getEnvs}
+	 * <li>{@link Conda#getVersion}</li>
+	 * <li>{@link Conda#runConda}</li>
+	 * <li>{@link Conda#runPython}</li>
+	 * <li>{@link Conda#getEnvs}</li>
 	 * </ul>
 	 * <p>
 	 */
@@ -85,7 +86,7 @@ public class CondaTest
 			final List< String > envs = conda.getEnvs();
 			assertThat( envs, is( Arrays.asList( envName ) ) );
 			conda.runPython( envName, "-c", "import cowsay; cowsay.cow('Hello World')" );
-			final File pythonScript = new File( "src/test/resources/org/elephant/conda/output_json.py" );
+			final File pythonScript = new File( "src/test/resources/org/javaconda/output_json.py" );
 			final Path jsonPath = Paths.get( folder.getRoot().getAbsolutePath(), "output.json" );
 			conda.runPython( envName, pythonScript.getAbsolutePath(), jsonPath.toString() );
 			final Gson gson = new Gson();

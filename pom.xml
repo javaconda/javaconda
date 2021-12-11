@@ -2,17 +2,17 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>org.elephant</groupId>
+	<groupId>org.javaconda</groupId>
 	<artifactId>javaconda</artifactId>
 	<version>0.1.1-SNAPSHOT</version>
 
-	<name>Java Conda</name>
-	<description>Conda wrapper for Java.</description>
-	<url>https://github.com/ksugar/javaconda</url>
+	<name>Javaconda</name>
+	<description>Java wrapper for Conda.</description>
+	<url>https://github.com/javaconda/javaconda</url>
 	<inceptionYear>2021</inceptionYear>
 	<organization>
-		<name>Institut de génomique fonctionnelle de Lyon</name>
-		<url>http://igfl.ens-lyon.fr</url>
+		<name>Javaconda</name>
+		<url>https://github.com/javaconda</url>
 	</organization>
 	<licenses>
 		<license>
@@ -46,14 +46,14 @@
 	</contributors>
 
 	<scm>
-		<connection>scm:git:git://github.com/ksugar/javaconda</connection>
-		<developerConnection>scm:git:git@github.com:ksugar/javaconda</developerConnection>
+		<connection>scm:git:git://github.com/javaconda/javaconda</connection>
+		<developerConnection>scm:git:git@github.com:javaconda/javaconda</developerConnection>
 		<tag>HEAD</tag>
-		<url>https://github.com/ksugar/javaconda</url>
+		<url>https://github.com/javaconda/javaconda</url>
 	</scm>
 	<issueManagement>
 		<system>GitHub Issues</system>
-		<url>https://github.com/ksugar/javaconda/issues</url>
+		<url>https://github.com/javaconda/javaconda/issues</url>
 	</issueManagement>
 	<ciManagement>
 		<system>None</system>
@@ -63,7 +63,7 @@
 		<package-name>org.elephant</package-name>
 		<main-class>org.elephant.conda.Conda</main-class>
 		<license.licenseName>bsd_2</license.licenseName>
-		<license.copyrightOwners>Institut de génomique fonctionnelle de Lyon.</license.copyrightOwners>
+		<license.copyrightOwners>Ko Sugawara</license.copyrightOwners>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 	</properties>
