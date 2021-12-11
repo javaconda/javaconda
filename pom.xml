@@ -4,7 +4,7 @@
 
 	<groupId>org.javaconda</groupId>
 	<artifactId>javaconda</artifactId>
-	<version>0.1.1</version>
+	<version>0.1.2-SNAPSHOT</version>
 
 	<name>Javaconda</name>
 	<description>Java wrapper for Conda.</description>
@@ -48,7 +48,7 @@
 	<scm>
 		<connection>scm:git:git://github.com/javaconda/javaconda</connection>
 		<developerConnection>scm:git:git@github.com:javaconda/javaconda</developerConnection>
-		<tag>javaconda-0.1.1</tag>
+		<tag>HEAD</tag>
 		<url>https://github.com/javaconda/javaconda</url>
 	</scm>
 	<issueManagement>
