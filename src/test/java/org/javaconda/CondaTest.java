@@ -34,19 +34,21 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
+import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.javaconda.Conda;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 /**
  * Tests {@link Conda} class.
@@ -116,6 +118,43 @@ public class CondaTest
 			this.name = name;
 		}
 
+	}
+
+	/**
+	 * Tests that {@link Conda} can handle Conda environment-associated environment
+	 * variables.
+	 * 
+	 */
+	@Test
+	public void testEnvironmentVariables()
+	{
+		try
+		{
+			final Conda conda = new Conda( Paths.get( folder.getRoot().getAbsolutePath(), "miniconda3" ).toString() );
+			final String envName = "test_envvars";
+			final File envFile = new File( "src/test/resources/org/javaconda/environment.yml" );
+			conda.runConda( "env", "create", "-f", envFile.getAbsolutePath(), "-n", envName );
+			final Map< String, String > inMap = conda.getEnvironmentVariables( envName );
+			inMap.forEach( ( key, value ) -> System.out.println( key + ":" + value ) );
+			assertEquals( "valueA", inMap.get( "JAVACONDA_TEST_VAR1" ) );
+			assertEquals( "valueB", inMap.get( "JAVACONDA_TEST_VAR2" ) );
+			final File pythonScript = new File( "src/test/resources/org/javaconda/output_envvars.py" );
+			final Path jsonPath = Paths.get( folder.getRoot().getAbsolutePath(), "environment.json" );
+			conda.runPython( envName, pythonScript.getAbsolutePath(), jsonPath.toString() );
+			final Gson gson = new Gson();
+			try (final Reader reader = Files.newBufferedReader( jsonPath ))
+			{
+				final Type type = new TypeToken< Map< String, String > >()
+				{}.getType();
+				final Map< String, String > outMap = gson.fromJson( reader, type );
+				assertEquals( "valueA", outMap.get( "JAVACONDA_TEST_VAR1" ) );
+				assertEquals( "valueB", outMap.get( "JAVACONDA_TEST_VAR2" ) );
+			}
+		}
+		catch ( final IOException | InterruptedException e )
+		{
+			fail( ExceptionUtils.getStackTrace( e ) );
+		}
 	}
 
 }
