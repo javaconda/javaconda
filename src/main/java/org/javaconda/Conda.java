@@ -149,12 +149,14 @@ public class Conda
 					tempFile,
 					TIMEOUT_MILLIS,
 					TIMEOUT_MILLIS );
+			final List< String > cmd = getBaseCommand();
+
 			if ( SystemUtils.IS_OS_WINDOWS )
-				new ProcessBuilder().command( "cmd.exe", "/c", "start", "/wait", "\"\"", tempFile.getAbsolutePath(), "/InstallationType=JustMe", "/AddToPath=0", "/RegisterPython=0", "/S", "/D=" + rootdir )
-						.inheritIO().start().waitFor();
+				cmd.addAll( Arrays.asList( "start", "/wait", "\"\"", tempFile.getAbsolutePath(), "/InstallationType=JustMe", "/AddToPath=0", "/RegisterPython=0", "/S", "/D=" + rootdir ) );
 			else
-				new ProcessBuilder().command( "bash", tempFile.getAbsolutePath(), "-b", "-p", rootdir )
-						.inheritIO().start().waitFor();
+				cmd.addAll( Arrays.asList( "bash", tempFile.getAbsolutePath(), "-b", "-p", rootdir ) );
+			if ( new ProcessBuilder().inheritIO().command( cmd ).start().waitFor() != 0 )
+				throw new RuntimeException();
 		}
 		this.rootdir = rootdir;
 
@@ -162,7 +164,8 @@ public class Conda
 		// expected.
 		final List< String > cmd = getBaseCommand();
 		cmd.addAll( Arrays.asList( condaCommand, "-V" ) );
-		getBuilder( false ).command( cmd ).start().waitFor();
+		if ( getBuilder( false ).command( cmd ).start().waitFor() != 0 )
+			throw new RuntimeException();
 	}
 
 	/**
@@ -181,7 +184,8 @@ public class Conda
 		final List< String > cmd = getBaseCommand();
 		cmd.addAll( Arrays.asList( condaCommand, "-V" ) );
 		final Process process = getBuilder( false ).command( cmd ).start();
-		process.waitFor();
+		if ( process.waitFor() != 0 )
+			throw new RuntimeException();
 		return new BufferedReader( new InputStreamReader( process.getInputStream() ) ).readLine();
 	}
 
@@ -202,7 +206,8 @@ public class Conda
 		final List< String > cmd = getBaseCommand();
 		cmd.add( condaCommand );
 		cmd.addAll( Arrays.asList( args ) );
-		getBuilder( true ).command( cmd ).start().waitFor();
+		if ( getBuilder( true ).command( cmd ).start().waitFor() != 0 )
+			throw new RuntimeException();
 	}
 
 	/**
@@ -238,7 +243,8 @@ public class Conda
 			envs.put( "Path", Paths.get( envDir, "Library", "Bin" ).toString() + ";" + envs.get( "Path" ) );
 		}
 		builder.environment().putAll( getEnvironmentVariables( envName ) );
-		builder.command( cmd ).start().waitFor();
+		if ( builder.command( cmd ).start().waitFor() != 0 )
+			throw new RuntimeException();
 	}
 
 	/**
@@ -260,7 +266,8 @@ public class Conda
 		final List< String > cmd = getBaseCommand();
 		cmd.addAll( Arrays.asList( condaCommand, "env", "config", "vars", "list", "-n", envName ) );
 		final Process process = getBuilder( false ).command( cmd ).start();
-		process.waitFor();
+		if ( process.waitFor() != 0 )
+			throw new RuntimeException();
 		final Map< String, String > map = new HashMap<>();
 		try (final BufferedReader reader = new BufferedReader( new InputStreamReader( process.getInputStream() ) ))
 		{
