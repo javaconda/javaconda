@@ -5,9 +5,19 @@ JavaConda is a Java wrapper for [Conda](https://docs.conda.io/en/latest/index.ht
 
 ## Getting started
 
+```java
+final Conda conda = new Conda( Paths.get(System.getProperty("user.home"), "miniconda").toString() );
+final String envName = "test";
+conda.create( envName ); // conda create -n envName
+conda.activate( envName ); // conda activate envName
+conda.install( "python=3.8" ); // conda install -y python=3.8
+conda.pipInstall( "cowsay" ); // pip install cowsay
+conda.runPython( "-c", "import cowsay; cowsay.cow('Hello World')" ); // python -c "import cowsay; cowsay.cow('Hello World')"
+```
+
 ### Create an instance of Conda class
 
-```
+```java
 final Conda conda = new Conda( Paths.get(System.getProperty("user.home"), "miniconda").toString() );
 ```
 
@@ -48,14 +58,32 @@ conda 4.10.3
 
 ```java
 final String envName = "test";
+conda.create( envName );
+```
+
+<details>
+<summary>additional info</summary>
+
+The command will throw an exception if the environment with the specified name already exists.\
+You can force overwriting it by adding the `isForceCreation` flag.
+
+```java
+conda.create( envName, true );
+```
+
+This is equivalent to the following code written in an explicit style.
+
+```java
 conda.runConda( "create", "-y", "-n", envName );
 ```
+
+</details>
 
 #### Create an environment from an environment file
 
 ```java
 final File envFile = new File( "path/to/environment.yml" );
-conda.runConda( "env", "create", "-f", envFile.getAbsolutePath() );
+conda.create( envName, "-f", envFile.getAbsolutePath() );
 ```
 
 <details>
@@ -74,22 +102,74 @@ variables:
 
 </details>
 
+<details>
+<summary>explicit style</summary>
+
+```java
+conda.runConda( "env", "create", "-n", envName, "-f", envFile.getAbsolutePath() );
+```
+
+</details>
+
+
+### Activate an environment
+
+```java
+conda.activate( envName );
+```
+
 ### Install Conda modules
+
+```java
+conda.install( "python=3.8" );
+```
+
+<details>
+<summary>without activation</summary>
+
+```java
+conda.install( envName, "python=3.8" );
+```
+
+</details>
+
+<details>
+<summary>explicit style</summary>
 
 ```java
 conda.runConda( "install", "-y", "-n", envName, "python=3.8" );
 ```
 
+</details>
+
 ### Install Pip moduels
+
+```java
+conda.pipInstall( "cowsay" );
+```
+
+<details>
+<summary>without activation</summary>
+
+```java
+conda.pipInstallIn( envName, "cowsay" );
+```
+
+</details>
+
+<details>
+<summary>explicit style</summary>
 
 ```java
 conda.runPython( envName, "-m", "pip", "install", "cowsay" );
 ```
 
+</details>
+
 ### List Conda environment names
 
 ```java
-final List< String > envs = conda.getEnvs();
+final List< String > envNames = conda.getEnvironmentNames();
 ```
 
 ### Run a Conda command
@@ -105,8 +185,18 @@ conda.runConda( "-h" );
  In Windows, this method also sets the `PATH` environment variable used by the specified environment.
 
 ```java
-conda.runPython( envName, "-c", "import cowsay; cowsay.cow('Hello World')" );
+conda.runPython( "-c", "import cowsay; cowsay.cow('Hello World')" );
 ```
+
+<details>
+<summary>without activation</summary>
+
+```java
+conda.runPythonIn( envName, "-c", "import cowsay; cowsay.cow('Hello World')" );
+```
+
+</details>
+
 
 <details>
 <summary>output</summary>
@@ -171,7 +261,7 @@ class User
 ```java
 final File pythonScript = new File( "output_json.py" );
 final Path jsonPath = Paths.get( "output.json" );
-conda.runPython( envName, pythonScript.getAbsolutePath(), jsonPath.toString() );
+conda.runPython( pythonScript.getAbsolutePath(), jsonPath.toString() );
 final Gson gson = new Gson();
 try (final Reader reader = Files.newBufferedReader( jsonPath ))
 {
@@ -191,9 +281,19 @@ User id: 0, User name: test
 ### Get environment variables associated with the specified environment
 
 ```java
-final Map< String, String > envvars = conda.getEnvironmentVariables( envName );
+conda.activate( envName );
+final Map< String, String > envvars = conda.getEnvironmentVariables();
 envvars.forEach( ( key, value ) -> System.out.println( key + ":" + value ) );
 ```
+
+<details>
+<summary>without activation</summary>
+
+```java
+final Map< String, String > envvars = conda.getEnvironmentVariables( envName );
+```
+
+</details>
 
 <details>
 <summary>output</summary>

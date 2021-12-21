@@ -4,7 +4,7 @@
 
 	<groupId>org.javaconda</groupId>
 	<artifactId>javaconda</artifactId>
-	<version>0.2.0</version>
+	<version>0.3.0-SNAPSHOT</version>
 
 	<name>Javaconda</name>
 	<description>Java wrapper for Conda.</description>
@@ -48,7 +48,7 @@
 	<scm>
 		<connection>scm:git:git://github.com/javaconda/javaconda</connection>
 		<developerConnection>scm:git:git@github.com:javaconda/javaconda</developerConnection>
-		<tag>javaconda-0.2.0</tag>
+		<tag>HEAD</tag>
 		<url>https://github.com/javaconda/javaconda</url>
 	</scm>
 	<issueManagement>
@@ -95,6 +95,11 @@
 			<groupId>com.google.code.gson</groupId>
 			<artifactId>gson</artifactId>
 			<version>2.8.9</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven</groupId>
+			<artifactId>maven-artifact</artifactId>
+			<version>3.8.4</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

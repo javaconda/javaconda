@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.javaconda.CondaException.EnvironmentExistsException;
 
 /**
  * Conda wrapper.
@@ -61,11 +62,15 @@ public class Conda
 
 	private final static String DOWNLOAD_URL_WIN = "https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe";
 
+	public final static String DEFAULT_ENVIRONMENT_NAME = "base";
+
 	private final String rootdir;
+
+	private String envName = DEFAULT_ENVIRONMENT_NAME;
 
 	final String condaCommand = SystemUtils.IS_OS_WINDOWS ? "condabin\\conda.bat" : "condabin/conda";
 
-	final String pythonCommand = SystemUtils.IS_OS_WINDOWS ? "envs\\%s\\python.exe" : "envs/%s/bin/python";
+	final String pythonCommand = SystemUtils.IS_OS_WINDOWS ? "python.exe" : "bin/python";
 
 	/**
 	 * Returns a {@link ProcessBuilder} with the working directory specified in the
@@ -149,12 +154,14 @@ public class Conda
 					tempFile,
 					TIMEOUT_MILLIS,
 					TIMEOUT_MILLIS );
+			final List< String > cmd = getBaseCommand();
+
 			if ( SystemUtils.IS_OS_WINDOWS )
-				new ProcessBuilder().command( "cmd.exe", "/c", "start", "/wait", "\"\"", tempFile.getAbsolutePath(), "/InstallationType=JustMe", "/AddToPath=0", "/RegisterPython=0", "/S", "/D=" + rootdir )
-						.inheritIO().start().waitFor();
+				cmd.addAll( Arrays.asList( "start", "/wait", "\"\"", tempFile.getAbsolutePath(), "/InstallationType=JustMe", "/AddToPath=0", "/RegisterPython=0", "/S", "/D=" + rootdir ) );
 			else
-				new ProcessBuilder().command( "bash", tempFile.getAbsolutePath(), "-b", "-p", rootdir )
-						.inheritIO().start().waitFor();
+				cmd.addAll( Arrays.asList( "bash", tempFile.getAbsolutePath(), "-b", "-p", rootdir ) );
+			if ( new ProcessBuilder().inheritIO().command( cmd ).start().waitFor() != 0 )
+				throw new RuntimeException();
 		}
 		this.rootdir = rootdir;
 
@@ -162,34 +169,17 @@ public class Conda
 		// expected.
 		final List< String > cmd = getBaseCommand();
 		cmd.addAll( Arrays.asList( condaCommand, "-V" ) );
-		getBuilder( false ).command( cmd ).start().waitFor();
+		if ( getBuilder( false ).command( cmd ).start().waitFor() != 0 )
+			throw new RuntimeException();
 	}
 
 	/**
-	 * Returns Conda version as a {@code String}.
-	 * 
-	 * @return The Conda version as a {@code String}.
-	 * @throws IOException
-	 *             If an I/O error occurs.
-	 * @throws InterruptedException
-	 *             If the current thread is interrupted by another thread while it
-	 *             is waiting, then the wait is ended and an InterruptedException is
-	 *             thrown.
-	 */
-	public String getVersion() throws IOException, InterruptedException
-	{
-		final List< String > cmd = getBaseCommand();
-		cmd.addAll( Arrays.asList( condaCommand, "-V" ) );
-		final Process process = getBuilder( false ).command( cmd ).start();
-		process.waitFor();
-		return new BufferedReader( new InputStreamReader( process.getInputStream() ) ).readLine();
-	}
-
-	/**
-	 * Run a Conda command with one or more arguments.
+	 * Run {@code conda update} in the activated environment. A list of packages to
+	 * be updated and extra parameters can be specified as {@code args}.
 	 * 
 	 * @param args
-	 *            One or more arguments for the Conda command.
+	 *            The list of packages to be updated and extra parameters as
+	 *            {@code String...}.
 	 * @throws IOException
 	 *             If an I/O error occurs.
 	 * @throws InterruptedException
@@ -197,12 +187,276 @@ public class Conda
 	 *             is waiting, then the wait is ended and an InterruptedException is
 	 *             thrown.
 	 */
-	public void runConda( final String... args ) throws IOException, InterruptedException
+	public void update( final String... args ) throws IOException, InterruptedException
 	{
-		final List< String > cmd = getBaseCommand();
-		cmd.add( condaCommand );
+		updateIn( envName, args );
+	}
+
+	/**
+	 * Run {@code conda update} in the specified environment. A list of packages to
+	 * update and extra parameters can be specified as {@code args}.
+	 * 
+	 * @param envName
+	 *            The environment name to be used for the update command.
+	 * @param args
+	 *            The list of packages to be updated and extra parameters as
+	 *            {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void updateIn( final String envName, final String... args ) throws IOException, InterruptedException
+	{
+		final List< String > cmd = new ArrayList<>( Arrays.asList( "update", "-y", "-n", envName ) );
 		cmd.addAll( Arrays.asList( args ) );
-		getBuilder( true ).command( cmd ).start().waitFor();
+		runConda( cmd.stream().toArray( String[]::new ) );
+	}
+
+	/**
+	 * Run {@code conda create} to create an empty conda environment.
+	 * 
+	 * @param envName
+	 *            The environment name to be created.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void create( final String envName ) throws IOException, InterruptedException
+	{
+		create( envName, false );
+	}
+
+	/**
+	 * Run {@code conda create} to create an empty conda environment.
+	 * 
+	 * @param envName
+	 *            The environment name to be created.
+	 * @param isForceCreation
+	 *            Force creation of the environment if {@code true}. If this value
+	 *            is {@code false} and an environment with the specified name
+	 *            already exists, throw an {@link EnvironmentExistsException}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void create( final String envName, final boolean isForceCreation ) throws IOException, InterruptedException
+	{
+		if ( !isForceCreation && getEnvironmentNames().contains( envName ) )
+			throw new EnvironmentExistsException();
+		runConda( "create", "-y", "-n", envName );
+	}
+
+	/**
+	 * Run {@code conda create} to create a new conda environment with a list of
+	 * specified packages.
+	 * 
+	 * @param envName
+	 *            The environment name to be created.
+	 * @param args
+	 *            The list of packages to be installed on environment creation and
+	 *            extra parameters as {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void create( final String envName, final String... args ) throws IOException, InterruptedException
+	{
+		create( envName, false, args );
+	}
+
+	/**
+	 * Run {@code conda create} to create a new conda environment with a list of
+	 * specified packages.
+	 * 
+	 * @param envName
+	 *            The environment name to be created.
+	 * @param isForceCreation
+	 *            Force creation of the environment if {@code true}. If this value
+	 *            is {@code false} and an environment with the specified name
+	 *            already exists, throw an {@link EnvironmentExistsException}.
+	 * @param args
+	 *            The list of packages to be installed on environment creation and
+	 *            extra parameters as {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void create( final String envName, final boolean isForceCreation, final String... args ) throws IOException, InterruptedException
+	{
+		if ( !isForceCreation && getEnvironmentNames().contains( envName ) )
+			throw new EnvironmentExistsException();
+		final List< String > cmd = new ArrayList<>( Arrays.asList( "env", "create", "--force", "-n", envName ) );
+		cmd.addAll( Arrays.asList( args ) );
+		runConda( cmd.stream().toArray( String[]::new ) );
+	}
+
+	/**
+	 * This method works as if the user runs {@code conda activate envName}. This
+	 * method internally calls {@link Conda#setEnvName(String)}.
+	 * 
+	 * @param envName
+	 *            The environment name to be activated.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 */
+	public void activate( final String envName ) throws IOException
+	{
+		if ( getEnvironmentNames().contains( envName ) )
+			setEnvName( envName );
+		else
+			throw new IllegalArgumentException( "environment: " + envName + " not found." );
+	}
+
+	/**
+	 * This method works as if the user runs {@code conda deactivate}. This method
+	 * internally sets the {@code envName} to {@code base}.
+	 */
+	public void deactivate()
+	{
+		setEnvName( DEFAULT_ENVIRONMENT_NAME );
+	}
+
+	/**
+	 * This method is used by {@code Conda#activate(String)} and
+	 * {@code Conda#deactivate()}. This method is kept private since it is not
+	 * expected to call this method directory.
+	 * 
+	 * @param envName
+	 *            The environment name to be set.
+	 */
+	private void setEnvName( final String envName )
+	{
+		this.envName = envName;
+	}
+
+	/**
+	 * Returns the active environment name.
+	 * 
+	 * @return The active environment name.
+	 * 
+	 */
+	public String getEnvName()
+	{
+		return envName;
+	}
+
+	/**
+	 * Run {@code conda install} in the activated environment. A list of packages to
+	 * install and extra parameters can be specified as {@code args}.
+	 * 
+	 * @param args
+	 *            The list of packages to be installed and extra parameters as
+	 *            {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void install( final String... args ) throws IOException, InterruptedException
+	{
+		installIn( envName, args );
+	}
+
+	/**
+	 * Run {@code conda install} in the specified environment. A list of packages to
+	 * install and extra parameters can be specified as {@code args}.
+	 * 
+	 * @param envName
+	 *            The environment name to be used for the install command.
+	 * @param args
+	 *            The list of packages to be installed and extra parameters as
+	 *            {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void installIn( final String envName, final String... args ) throws IOException, InterruptedException
+	{
+		final List< String > cmd = new ArrayList<>( Arrays.asList( "install", "-y", "-n", envName ) );
+		cmd.addAll( Arrays.asList( args ) );
+		runConda( cmd.stream().toArray( String[]::new ) );
+	}
+
+	/**
+	 * Run {@code pip install} in the activated environment. A list of packages to
+	 * install and extra parameters can be specified as {@code args}.
+	 * 
+	 * @param args
+	 *            The list of packages to be installed and extra parameters as
+	 *            {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void pipInstall( final String... args ) throws IOException, InterruptedException
+	{
+		pipInstallIn( envName, args );
+	}
+
+	/**
+	 * Run {@code pip install} in the specified environment. A list of packages to
+	 * install and extra parameters can be specified as {@code args}.
+	 * 
+	 * @param envName
+	 *            The environment name to be used for the install command.
+	 * @param args
+	 *            The list of packages to be installed and extra parameters as
+	 *            {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void pipInstallIn( final String envName, final String... args ) throws IOException, InterruptedException
+	{
+		final List< String > cmd = new ArrayList<>( Arrays.asList( "-m", "pip", "install" ) );
+		cmd.addAll( Arrays.asList( args ) );
+		runPythonIn( envName, cmd.stream().toArray( String[]::new ) );
+	}
+
+	/**
+	 * Run a Python command in the activated environment. This method automatically
+	 * sets environment variables associated with the activated environment. In
+	 * Windows, this method also sets the {@code PATH} environment variable so that
+	 * the specified environment runs as expected.
+	 * 
+	 * @param args
+	 *            One or more arguments for the Python command.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void runPython( final String... args ) throws IOException, InterruptedException
+	{
+		runPythonIn( envName, args );
 	}
 
 	/**
@@ -222,10 +476,13 @@ public class Conda
 	 *             is waiting, then the wait is ended and an InterruptedException is
 	 *             thrown.
 	 */
-	public void runPython( final String envName, final String... args ) throws IOException, InterruptedException
+	public void runPythonIn( final String envName, final String... args ) throws IOException, InterruptedException
 	{
 		final List< String > cmd = getBaseCommand();
-		cmd.add( String.format( pythonCommand, envName ) );
+		if ( envName.equals( DEFAULT_ENVIRONMENT_NAME ) )
+			cmd.add( pythonCommand );
+		else
+			cmd.add( Paths.get( "envs", envName, pythonCommand ).toString() );
 		cmd.addAll( Arrays.asList( args ) );
 		final ProcessBuilder builder = getBuilder( true );
 		if ( SystemUtils.IS_OS_WINDOWS )
@@ -238,7 +495,67 @@ public class Conda
 			envs.put( "Path", Paths.get( envDir, "Library", "Bin" ).toString() + ";" + envs.get( "Path" ) );
 		}
 		builder.environment().putAll( getEnvironmentVariables( envName ) );
-		builder.command( cmd ).start().waitFor();
+		if ( builder.command( cmd ).start().waitFor() != 0 )
+			throw new RuntimeException();
+	}
+
+	/**
+	 * Returns Conda version as a {@code String}.
+	 * 
+	 * @return The Conda version as a {@code String}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public String getVersion() throws IOException, InterruptedException
+	{
+		final List< String > cmd = getBaseCommand();
+		cmd.addAll( Arrays.asList( condaCommand, "-V" ) );
+		final Process process = getBuilder( false ).command( cmd ).start();
+		if ( process.waitFor() != 0 )
+			throw new RuntimeException();
+		return new BufferedReader( new InputStreamReader( process.getInputStream() ) ).readLine();
+	}
+
+	/**
+	 * Run a Conda command with one or more arguments.
+	 * 
+	 * @param args
+	 *            One or more arguments for the Conda command.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void runConda( final String... args ) throws RuntimeException, IOException, InterruptedException
+	{
+		final List< String > cmd = getBaseCommand();
+		cmd.add( condaCommand );
+		cmd.addAll( Arrays.asList( args ) );
+		if ( getBuilder( true ).command( cmd ).start().waitFor() != 0 )
+			throw new RuntimeException();
+	}
+
+	/**
+	 * Returns environment variables associated with the activated environment as
+	 * {@code Map< String, String >}.
+	 * 
+	 * @return The environment variables as {@code Map< String, String >}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public Map< String, String > getEnvironmentVariables() throws IOException, InterruptedException
+	{
+		return getEnvironmentVariables( envName );
 	}
 
 	/**
@@ -260,7 +577,8 @@ public class Conda
 		final List< String > cmd = getBaseCommand();
 		cmd.addAll( Arrays.asList( condaCommand, "env", "config", "vars", "list", "-n", envName ) );
 		final Process process = getBuilder( false ).command( cmd ).start();
-		process.waitFor();
+		if ( process.waitFor() != 0 )
+			throw new RuntimeException();
 		final Map< String, String > map = new HashMap<>();
 		try (final BufferedReader reader = new BufferedReader( new InputStreamReader( process.getInputStream() ) ))
 		{
@@ -276,9 +594,9 @@ public class Conda
 	}
 
 	/**
-	 * Returns a list of the Conda environments as {@code List< String >}.
+	 * Returns a list of the Conda environment names as {@code List< String >}.
 	 * 
-	 * @return The list of the Conda environments as {@code List< String >}.
+	 * @return The list of the Conda environment names as {@code List< String >}.
 	 * @throws IOException
 	 *             If an I/O error occurs.
 	 * @throws InterruptedException
@@ -286,12 +604,14 @@ public class Conda
 	 *             is waiting, then the wait is ended and an InterruptedException is
 	 *             thrown.
 	 */
-	public List< String > getEnvs() throws IOException
+	public List< String > getEnvironmentNames() throws IOException
 	{
-		return Files.list( Paths.get( rootdir, "envs" ) )
+		final List< String > envs = new ArrayList<>( Arrays.asList( DEFAULT_ENVIRONMENT_NAME ) );
+		envs.addAll( Files.list( Paths.get( rootdir, "envs" ) )
 				.map( p -> p.getFileName().toString() )
 				.filter( p -> !p.startsWith( "." ) )
-				.collect( Collectors.toList() );
+				.collect( Collectors.toList() ) );
+		return envs;
 	}
 
 }

@@ -29,6 +29,7 @@ package org.javaconda;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
@@ -43,6 +44,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.maven.artifact.versioning.ComparableVersion;
+import org.javaconda.CondaException.EnvironmentExistsException;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -68,8 +71,8 @@ public class CondaTest
 	 * <ul>
 	 * <li>{@link Conda#getVersion}</li>
 	 * <li>{@link Conda#runConda}</li>
-	 * <li>{@link Conda#runPython}</li>
-	 * <li>{@link Conda#getEnvs}</li>
+	 * <li>{@link Conda#runPythonIn}</li>
+	 * <li>{@link Conda#getEnvironmentNames}</li>
 	 * </ul>
 	 * <p>
 	 */
@@ -84,13 +87,13 @@ public class CondaTest
 			final String envName = "test";
 			conda.runConda( "create", "-y", "-n", envName );
 			conda.runConda( "install", "-y", "-n", envName, "python=3.8" );
-			conda.runPython( envName, "-m", "pip", "install", "cowsay" );
-			final List< String > envs = conda.getEnvs();
-			assertThat( envs, is( Arrays.asList( envName ) ) );
-			conda.runPython( envName, "-c", "import cowsay; cowsay.cow('Hello World')" );
+			conda.runPythonIn( envName, "-m", "pip", "install", "cowsay" );
+			final List< String > envNames = conda.getEnvironmentNames();
+			assertThat( envNames, is( Arrays.asList( Conda.DEFAULT_ENVIRONMENT_NAME, envName ) ) );
+			conda.runPythonIn( envName, "-c", "import cowsay; cowsay.cow('Hello World')" );
 			final File pythonScript = new File( "src/test/resources/org/javaconda/output_json.py" );
 			final Path jsonPath = Paths.get( folder.getRoot().getAbsolutePath(), "output.json" );
-			conda.runPython( envName, pythonScript.getAbsolutePath(), jsonPath.toString() );
+			conda.runPythonIn( envName, pythonScript.getAbsolutePath(), jsonPath.toString() );
 			final Gson gson = new Gson();
 			try (final Reader reader = Files.newBufferedReader( jsonPath ))
 			{
@@ -133,14 +136,14 @@ public class CondaTest
 			final Conda conda = new Conda( Paths.get( folder.getRoot().getAbsolutePath(), "miniconda3" ).toString() );
 			final String envName = "test_envvars";
 			final File envFile = new File( "src/test/resources/org/javaconda/environment.yml" );
-			conda.runConda( "env", "create", "-f", envFile.getAbsolutePath(), "-n", envName );
+			conda.create( envName, "-f", envFile.getAbsolutePath() );
 			final Map< String, String > inMap = conda.getEnvironmentVariables( envName );
 			inMap.forEach( ( key, value ) -> System.out.println( key + ":" + value ) );
 			assertEquals( "valueA", inMap.get( "JAVACONDA_TEST_VAR1" ) );
 			assertEquals( "valueB", inMap.get( "JAVACONDA_TEST_VAR2" ) );
 			final File pythonScript = new File( "src/test/resources/org/javaconda/output_envvars.py" );
 			final Path jsonPath = Paths.get( folder.getRoot().getAbsolutePath(), "environment.json" );
-			conda.runPython( envName, pythonScript.getAbsolutePath(), jsonPath.toString() );
+			conda.runPythonIn( envName, pythonScript.getAbsolutePath(), jsonPath.toString() );
 			final Gson gson = new Gson();
 			try (final Reader reader = Files.newBufferedReader( jsonPath ))
 			{
@@ -150,6 +153,144 @@ public class CondaTest
 				assertEquals( "valueA", outMap.get( "JAVACONDA_TEST_VAR1" ) );
 				assertEquals( "valueB", outMap.get( "JAVACONDA_TEST_VAR2" ) );
 			}
+		}
+		catch ( final IOException | InterruptedException e )
+		{
+			fail( ExceptionUtils.getStackTrace( e ) );
+		}
+	}
+
+	/**
+	 * Test {@link Conda#create} if it throws an {@link EnvironmentExistsException}
+	 * on duplicate environment creation.
+	 */
+	@Test( expected = EnvironmentExistsException.class )
+	public void testDuplicateEnvironmentCreation()
+	{
+		try
+		{
+			final Conda conda = new Conda( Paths.get( folder.getRoot().getAbsolutePath(), "miniconda3" ).toString() );
+			final String envName = "test";
+			conda.create( envName );
+			conda.create( envName );
+		}
+		catch ( IOException | InterruptedException e )
+		{
+			fail( ExceptionUtils.getStackTrace( e ) );
+		}
+	}
+
+	/**
+	 * Test the base environment.
+	 */
+	@Test
+	public void testBaseEnvironment()
+	{
+		try
+		{
+			final Conda conda = new Conda( Paths.get( folder.getRoot().getAbsolutePath(), "miniconda3" ).toString() );
+			conda.install( "python=3.8" );
+			conda.pipInstall( "cowsay" );
+			final List< String > envNames = conda.getEnvironmentNames();
+			assertThat( envNames, is( Arrays.asList( Conda.DEFAULT_ENVIRONMENT_NAME ) ) );
+			conda.runPython( "-c", "import cowsay; cowsay.cow('Hello World')" );
+			final File pythonScript = new File( "src/test/resources/org/javaconda/output_json.py" );
+			final Path jsonPath = Paths.get( folder.getRoot().getAbsolutePath(), "output.json" );
+			conda.runPython( pythonScript.getAbsolutePath(), jsonPath.toString() );
+			final Gson gson = new Gson();
+			try (final Reader reader = Files.newBufferedReader( jsonPath ))
+			{
+				final User user = gson.fromJson( reader, User.class );
+				final User expected = new User( 0, "test" );
+				assertEquals( expected.id, user.id );
+				assertEquals( expected.name, user.name );
+			}
+		}
+		catch ( final IOException | InterruptedException e )
+		{
+			fail( ExceptionUtils.getStackTrace( e ) );
+		}
+	}
+
+	/**
+	 * Test {@link Conda#activate}.
+	 */
+	@Test
+	public void testActivate()
+	{
+		try
+		{
+			final Conda conda = new Conda( Paths.get( folder.getRoot().getAbsolutePath(), "miniconda3" ).toString() );
+			final String version = conda.getVersion();
+			System.out.println( version );
+			final String envName = "test";
+			conda.create( envName );
+			conda.activate( envName );
+			assertEquals( envName, conda.getEnvName() );
+			conda.install( "python=3.8" );
+			conda.pipInstall( "cowsay" );
+			final List< String > envNames = conda.getEnvironmentNames();
+			assertThat( envNames, is( Arrays.asList( Conda.DEFAULT_ENVIRONMENT_NAME, envName ) ) );
+			conda.runPython( "-c", "import cowsay; cowsay.cow('Hello World')" );
+			final File pythonScript = new File( "src/test/resources/org/javaconda/output_json.py" );
+			final Path jsonPath = Paths.get( folder.getRoot().getAbsolutePath(), "output.json" );
+			conda.runPython( pythonScript.getAbsolutePath(), jsonPath.toString() );
+			final Gson gson = new Gson();
+			try (final Reader reader = Files.newBufferedReader( jsonPath ))
+			{
+				final User user = gson.fromJson( reader, User.class );
+				final User expected = new User( 0, "test" );
+				assertEquals( expected.id, user.id );
+				assertEquals( expected.name, user.name );
+			}
+		}
+		catch ( final IOException | InterruptedException e )
+		{
+			fail( ExceptionUtils.getStackTrace( e ) );
+		}
+	}
+
+	/**
+	 * Test {@link Conda#deactivate}.
+	 */
+	@Test( expected = RuntimeException.class )
+	public void testDeactivate()
+	{
+		try
+		{
+			final Conda conda = new Conda( Paths.get( folder.getRoot().getAbsolutePath(), "miniconda3" ).toString() );
+			final String version = conda.getVersion();
+			System.out.println( version );
+			final String envName = "test";
+			conda.create( envName );
+			conda.activate( envName );
+			assertEquals( envName, conda.getEnvName() );
+			conda.install( "python=3.8" );
+			conda.pipInstall( "cowsay" );
+			conda.runPython( "-c", "import cowsay; cowsay.cow('Hello World')" );
+			conda.deactivate();
+			assertEquals( Conda.DEFAULT_ENVIRONMENT_NAME, conda.getEnvName() );
+			conda.runPython( "-c", "import cowsay; cowsay.cow('Hello World')" );
+		}
+		catch ( final IOException | InterruptedException e )
+		{
+			fail( ExceptionUtils.getStackTrace( e ) );
+		}
+	}
+
+	/**
+	 * Test {@link Conda#update}.
+	 */
+	@Test
+	public void testUpdate()
+	{
+		try
+		{
+			final Conda conda = new Conda( Paths.get( folder.getRoot().getAbsolutePath(), "miniconda3" ).toString() );
+			final ComparableVersion versionBefore = new ComparableVersion( conda.getVersion() );
+			conda.update( "conda" );
+			final ComparableVersion versionAfter = new ComparableVersion( conda.getVersion() );
+			assertTrue( versionBefore.compareTo( versionAfter ) <= 0 );
 		}
 		catch ( final IOException | InterruptedException e )
 		{
