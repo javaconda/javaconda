@@ -300,9 +300,18 @@ public class Conda
 	{
 		if ( !isForceCreation && getEnvironmentNames().contains( envName ) )
 			throw new EnvironmentExistsException();
-		final List< String > cmd = new ArrayList<>( Arrays.asList( "env", "create", "--force", "-n", envName ) );
-		cmd.addAll( Arrays.asList( args ) );
-		runConda( cmd.stream().toArray( String[]::new ) );
+		try
+		{
+			final List< String > cmd = new ArrayList<>( Arrays.asList( "env", "create", "--force", "-n", envName ) );
+			cmd.addAll( Arrays.asList( args ) );
+			runConda( cmd.stream().toArray( String[]::new ) );
+		}
+		catch ( final RuntimeException e )
+		{
+			final List< String > cmd = new ArrayList<>( Arrays.asList( "create", "-y", "-n", envName ) );
+			cmd.addAll( Arrays.asList( args ) );
+			runConda( cmd.stream().toArray( String[]::new ) );
+		}
 	}
 
 	/**
