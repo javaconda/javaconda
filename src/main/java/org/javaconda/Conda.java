@@ -64,6 +64,10 @@ public class Conda
 
 	public final static String DEFAULT_ENVIRONMENT_NAME = "base";
 
+	public final static String ENVVAR_JAVACONDA_ROOT = "JAVACONDA_ROOT";
+
+	public final static String DEFAULT_JAVACONDA_ROOT = Paths.get( System.getProperty( "user.home" ), "javaconda" ).toString();
+
 	private final String rootdir;
 
 	private String envName = DEFAULT_ENVIRONMENT_NAME;
@@ -104,6 +108,38 @@ public class Conda
 		if ( SystemUtils.IS_OS_WINDOWS )
 			cmd.addAll( Arrays.asList( "cmd.exe", "/c" ) );
 		return cmd;
+	}
+
+	/**
+	 * Create a new Conda object. The root dir for Conda installation can be
+	 * specified with the environment variable {@code JAVACONDA_HOME}. If the
+	 * environment variable is not defined, the default directory
+	 * {@code ~/javaconda} will be used. If there is no directory found at the
+	 * specified path, Miniconda will be automatically installed in the path. It is
+	 * expected that the Conda installation has executable commands as shown below:
+	 * 
+	 * <pre>
+	 * CONDA_ROOT
+	 * ├── condabin
+	 * │   ├── conda(.bat)
+	 * │   ... 
+	 * ├── envs
+	 * │   ├── your_env
+	 * │   │   ├── python(.exe)
+	 * </pre>
+	 * 
+	 * @param rootdir
+	 *            The root dir for Conda installation.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public Conda() throws IOException, InterruptedException
+	{
+		this( System.getenv().getOrDefault( ENVVAR_JAVACONDA_ROOT, DEFAULT_JAVACONDA_ROOT ) );
 	}
 
 	/**
@@ -171,6 +207,22 @@ public class Conda
 		cmd.addAll( Arrays.asList( condaCommand, "-V" ) );
 		if ( getBuilder( false ).command( cmd ).start().waitFor() != 0 )
 			throw new RuntimeException();
+	}
+
+	/**
+	 * Returns the {@code rootdir} field.
+	 * 
+	 * @return The {@code rootdir} field as {@code String}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public String getRootdir()
+	{
+		return rootdir;
 	}
 
 	/**
