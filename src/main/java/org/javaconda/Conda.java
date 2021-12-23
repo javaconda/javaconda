@@ -407,6 +407,48 @@ public class Conda
 	}
 
 	/**
+	 * Run {@code conda uninstall} in the activated environment. A list of packages
+	 * to uninstall and extra parameters can be specified as {@code args}.
+	 * 
+	 * @param args
+	 *            The list of packages to be uninstalled and extra parameters as
+	 *            {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void uninstall( final String... args ) throws IOException, InterruptedException
+	{
+		uninstallIn( envName, args );
+	}
+
+	/**
+	 * Run {@code conda uninstall} in the specified environment. A list of packages
+	 * to uninstall and extra parameters can be specified as {@code args}.
+	 * 
+	 * @param envName
+	 *            The environment name to be used for the uninstall command.
+	 * @param args
+	 *            The list of packages to be uninstalled and extra parameters as
+	 *            {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void uninstallIn( final String envName, final String... args ) throws IOException, InterruptedException
+	{
+		final List< String > cmd = new ArrayList<>( Arrays.asList( "uninstall", "-y", "-n", envName ) );
+		cmd.addAll( Arrays.asList( args ) );
+		runConda( cmd.stream().toArray( String[]::new ) );
+	}
+
+	/**
 	 * Run {@code pip install} in the activated environment. A list of packages to
 	 * install and extra parameters can be specified as {@code args}.
 	 * 
@@ -444,6 +486,48 @@ public class Conda
 	public void pipInstallIn( final String envName, final String... args ) throws IOException, InterruptedException
 	{
 		final List< String > cmd = new ArrayList<>( Arrays.asList( "-m", "pip", "install" ) );
+		cmd.addAll( Arrays.asList( args ) );
+		runPythonIn( envName, cmd.stream().toArray( String[]::new ) );
+	}
+
+	/**
+	 * Run {@code pip uninstall} in the activated environment. A list of packages to
+	 * uninstall and extra parameters can be specified as {@code args}.
+	 * 
+	 * @param args
+	 *            The list of packages to be uninstalled and extra parameters as
+	 *            {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void pipUninstall( final String... args ) throws IOException, InterruptedException
+	{
+		pipUninstallIn( envName, args );
+	}
+
+	/**
+	 * Run {@code pip uninstall} in the specified environment. A list of packages to
+	 * uninstall and extra parameters can be specified as {@code args}.
+	 * 
+	 * @param envName
+	 *            The environment name to be used for the uninstall command.
+	 * @param args
+	 *            The list of packages to be uninstalled and extra parameters as
+	 *            {@code String...}.
+	 * @throws IOException
+	 *             If an I/O error occurs.
+	 * @throws InterruptedException
+	 *             If the current thread is interrupted by another thread while it
+	 *             is waiting, then the wait is ended and an InterruptedException is
+	 *             thrown.
+	 */
+	public void pipUninstallIn( final String envName, final String... args ) throws IOException, InterruptedException
+	{
+		final List< String > cmd = new ArrayList<>( Arrays.asList( "-m", "pip", "uninstall", "-y" ) );
 		cmd.addAll( Arrays.asList( args ) );
 		runPythonIn( envName, cmd.stream().toArray( String[]::new ) );
 	}

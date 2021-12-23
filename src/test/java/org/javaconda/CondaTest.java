@@ -109,6 +109,31 @@ public class CondaTest
 		}
 	}
 
+	/**
+	 * Tests {@link Conda#uninstall} and {@link Conda#pipUninstall}.
+	 */
+	@Test
+	public void testUninstall()
+	{
+		try
+		{
+			final Conda conda = new Conda( Paths.get( folder.getRoot().getAbsolutePath(), "miniconda3" ).toString() );
+			final String version = conda.getVersion();
+			System.out.println( version );
+			final String envName = "test";
+			conda.create( envName );
+			conda.activate( envName );
+			conda.install( "python=3.8" );
+			conda.pipInstall( "cowsay" );
+			conda.pipUninstall( "cowsay" );
+			conda.uninstall( "python=3.8" );
+		}
+		catch ( final IOException | InterruptedException e )
+		{
+			fail( ExceptionUtils.getStackTrace( e ) );
+		}
+	}
+
 	private class User
 	{
 		public final int id;
