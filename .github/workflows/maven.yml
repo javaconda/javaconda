@@ -11,13 +11,10 @@ on:
 
 jobs:
   build:
-
-    runs-on: ${{ matrix.os }}
-    
+    runs-on: ${{ matrix.os }}    
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-
     steps:
     - uses: actions/checkout@v2
     - name: Set up JDK 11
@@ -26,10 +23,10 @@ jobs:
         java-version: '11'
         distribution: 'adopt'
         cache: maven
-    - name: Build with Maven
-      uses: knicknic/os-specific-run@v1.0.3
-      with:
-        windowsShell: cmd
-        macos: mvn -B package --file pom.xml
-        linux: mvn -B package --file pom.xml
-        windows: mvn -B package --file pom.xml
+    - if: runner.os == 'Windows'
+      name: Build with Maven
+      shell: cmd
+      run: mvn -B package --file pom.xml
+    - if: runner.os != 'Windows'
+      name: Build with Maven
+      run: mvn -B package --file pom.xml
